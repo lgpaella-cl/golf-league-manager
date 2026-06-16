@@ -8,6 +8,7 @@ import { PlayerAvatar } from '@/components/shared/PlayerAvatar'
 import { formatDate, formatHandicap } from '@/lib/utils'
 import { PlayerDialog } from './player-dialog'
 import { ToggleActiveButton } from './toggle-active-button'
+import { InviteButton } from './invite-button'
 
 export const metadata = { title: 'Jugadores' }
 
@@ -22,6 +23,15 @@ export default async function PlayersPage() {
       _count: { select: { rounds: { where: { status: 'APPROVED' } } } },
     },
   })
+
+  const invitedPlayerIds = await prisma.invitation.findMany({
+    where: {
+      organizationId: session.organizationId,
+      usedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    select: { playerId: true },
+  }).then((rows) => new Set(rows.map((r) => r.playerId)))
 
   const active = players.filter((p) => p.isActive).length
 
@@ -49,12 +59,13 @@ export default async function PlayersPage() {
             <Th>Ingresó</Th>
             <Th className="text-center">Rondas</Th>
             <Th className="text-center">Estado</Th>
+            <Th className="text-center">Acceso</Th>
             <Th className="text-right">Acciones</Th>
           </tr>
         </Thead>
         <Tbody>
           {players.length === 0 ? (
-            <tr><Td colSpan={7} className="text-center text-gray-400 py-12">No hay jugadores registrados</Td></tr>
+            <tr><Td colSpan={8} className="text-center text-gray-400 py-12">No hay jugadores registrados</Td></tr>
           ) : players.map((player) => (
             <tr key={player.id} className="hover:bg-gray-50 transition-colors">
               <Td>
@@ -74,6 +85,17 @@ export default async function PlayersPage() {
                 <Badge variant={player.isActive ? 'green' : 'gray'}>
                   {player.isActive ? 'Activo' : 'Inactivo'}
                 </Badge>
+              </Td>
+              <Td className="text-center">
+                {player.userId ? (
+                  <span className="text-xs text-green-700 font-medium">✓ Activo</span>
+                ) : invitedPlayerIds.has(player.id) ? (
+                  <span className="text-xs text-blue-600">Invitado</span>
+                ) : player.email ? (
+                  <InviteButton playerId={player.id} />
+                ) : (
+                  <span className="text-xs text-gray-300">Sin email</span>
+                )}
               </Td>
               <Td>
                 <div className="flex items-center gap-2 justify-end">

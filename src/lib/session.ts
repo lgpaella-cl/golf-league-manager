@@ -8,6 +8,7 @@ export interface SessionPayload {
   role: string
   email: string
   name: string | null
+  playerId?: string
   expiresAt: Date
 }
 

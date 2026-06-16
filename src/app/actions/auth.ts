@@ -25,7 +25,10 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
 
   const user = await prisma.user.findUnique({
     where: { email },
-    include: { memberships: { include: { organization: true }, take: 1 } },
+    include: {
+      memberships: { take: 1 },
+      player: true,
+    },
   })
 
   if (!user || !user.hashedPassword) return { error: 'Credenciales incorrectas' }
@@ -42,8 +45,10 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
     role: membership.role,
     email: user.email,
     name: user.name,
+    playerId: user.player?.id,
   })
 
+  if (membership.role === 'PLAYER') redirect('/portal')
   redirect('/admin')
 }
 

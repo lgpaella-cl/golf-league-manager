@@ -32,6 +32,7 @@ model Organization {
   achievements Achievement[]
   feed         ActivityFeed[]
   auditLogs    AuditLog[]
+  invitations  Invitation[]
 
   @@map("organizations")
 }
@@ -69,6 +70,7 @@ model User {
   memberships    OrgMembership[]
   approvedRounds Round[]    @relation("ApprovedBy")
   auditLogs      AuditLog[]
+  player         Player?
 
   @@map("users")
 }
@@ -94,6 +96,7 @@ model OrgMembership {
 model Player {
   id             String   @id @default(cuid())
   organizationId String
+  userId         String?  @unique
   fullName       String
   slug           String
   email          String?
@@ -106,9 +109,11 @@ model Player {
   updatedAt      DateTime @updatedAt
 
   organization Organization    @relation(fields: [organizationId], references: [id])
+  user         User?           @relation(fields: [userId], references: [id])
   rounds       Round[]
   achievements Achievement[]
   rankings     SeasonRanking[]
+  invitations  Invitation[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, isActive])
@@ -313,4 +318,25 @@ model AuditLog {
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────
+// INVITATIONS
+// ─────────────────────────────────────────
+
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  playerId       String?
+  email          String
+  token          String    @unique @default(cuid())
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  player       Player?      @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([token])
+  @@map("invitations")
 }
