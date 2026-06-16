@@ -100,3 +100,17 @@ export async function togglePlayerActive(id: string, isActive: boolean) {
   await prisma.player.update({ where: { id }, data: { isActive } })
   revalidatePath('/admin/players')
 }
+
+export async function deletePlayer(id: string) {
+  const session = await getSession()
+  if (!session || !['ADMIN', 'SUPERADMIN'].includes(session.role)) return
+
+  // Desvincular usuario si lo tiene
+  await prisma.player.update({ where: { id }, data: { userId: null } }).catch(() => {})
+
+  // Cascade borra rounds → round_scores, round_awards, achievements, rankings, invitations
+  await prisma.player.delete({ where: { id } })
+
+  revalidatePath('/admin/players')
+  revalidatePath('/admin')
+}

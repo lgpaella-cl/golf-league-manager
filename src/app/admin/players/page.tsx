@@ -9,6 +9,7 @@ import { formatDate, formatHandicap } from '@/lib/utils'
 import { PlayerDialog } from './player-dialog'
 import { ToggleActiveButton } from './toggle-active-button'
 import { InviteButton } from './invite-button'
+import { DeletePlayerButton } from './delete-player-button'
 
 export const metadata = { title: 'Jugadores' }
 
@@ -105,6 +106,7 @@ export default async function PlayersPage() {
                     </button>
                   </PlayerDialog>
                   <ToggleActiveButton id={player.id} isActive={player.isActive} />
+                  <DeletePlayerButton id={player.id} name={player.fullName} />
                 </div>
               </Td>
             </tr>

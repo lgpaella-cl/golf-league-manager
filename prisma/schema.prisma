@@ -110,7 +110,7 @@ model Player {
 
   organization Organization    @relation(fields: [organizationId], references: [id])
   user         User?           @relation(fields: [userId], references: [id])
-  rounds       Round[]
+  rounds       Round[]         @relation("PlayerRounds")
   achievements Achievement[]
   rankings     SeasonRanking[]
   invitations  Invitation[]
@@ -184,7 +184,7 @@ model Round {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   season       Season       @relation(fields: [seasonId], references: [id])
-  player       Player       @relation(fields: [playerId], references: [id])
+  player       Player       @relation("PlayerRounds", fields: [playerId], references: [id], onDelete: Cascade)
   approvedBy   User?        @relation("ApprovedBy", fields: [approvedById], references: [id])
   scores       RoundScore[]
   awards       RoundAward[]
@@ -250,7 +250,7 @@ model SeasonRanking {
   calculatedAt   DateTime @default(now())
 
   season Season @relation(fields: [seasonId], references: [id])
-  player Player @relation(fields: [playerId], references: [id])
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, seasonId, playerId])
   @@map("season_rankings")
@@ -272,7 +272,7 @@ model Achievement {
   metadata       Json?
 
   organization Organization @relation(fields: [organizationId], references: [id])
-  player       Player       @relation(fields: [playerId], references: [id])
+  player       Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, playerId, type])
   @@map("achievements")
