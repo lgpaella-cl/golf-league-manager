@@ -90,10 +90,8 @@ export default async function PlayersPage() {
               <Td className="text-center">
                 {player.userId ? (
                   <span className="text-xs text-green-700 font-medium">✓ Activo</span>
-                ) : invitedPlayerIds.has(player.id) ? (
-                  <span className="text-xs text-blue-600">Invitado</span>
                 ) : player.email ? (
-                  <InviteButton playerId={player.id} />
+                  <InviteButton playerId={player.id} alreadyInvited={invitedPlayerIds.has(player.id)} />
                 ) : (
                   <span className="text-xs text-gray-300">Sin email</span>
                 )}
