@@ -1,7 +1,20 @@
 import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { AdminSidebar } from '@/components/layout/AdminSidebar'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const session = await getSession()
+  if (!session) return {}
+  const org = await prisma.organization.findUnique({
+    where: { id: session.organizationId },
+    select: { name: true },
+  })
+  return {
+    title: { default: org?.name ?? 'Golf League', template: `%s · ${org?.name ?? 'Golf League'}` },
+  }
+}
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession()
