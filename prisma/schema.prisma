@@ -1,0 +1,316 @@
+// Golf League Manager — Prisma Schema v7
+// Multi-tenant SaaS para ligas de golf amateur
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────
+// MULTI-TENANT CORE
+// ─────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings     OrganizationSettings?
+  memberships  OrgMembership[]
+  players      Player[]
+  seasons      Season[]
+  rounds       Round[]
+  awards       RoundAward[]
+  achievements Achievement[]
+  feed         ActivityFeed[]
+  auditLogs    AuditLog[]
+
+  @@map("organizations")
+}
+
+model OrganizationSettings {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  scoringSystem     String @default("POINTS")
+  pointsConfig      Json   @default("{\"positions\":[100,90,85,80,76,72,68,64,60,56],\"participation\":40}")
+  maxRoundsPerMonth Int    @default(2)
+  validMonthsCount  Int    @default(6)
+  autoDiscards      Int    @default(1)
+  specialAwards     Json?
+
+  updatedAt DateTime @updatedAt
+
+  @@map("organization_settings")
+}
+
+// ─────────────────────────────────────────
+// USERS & AUTH (custom JWT with jose)
+// ─────────────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  hashedPassword String?
+  image          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  memberships    OrgMembership[]
+  approvedRounds Round[]    @relation("ApprovedBy")
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model OrgMembership {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  role           String   @default("VIEWER")
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("org_memberships")
+}
+
+// ─────────────────────────────────────────
+// PLAYERS
+// ─────────────────────────────────────────
+
+model Player {
+  id             String   @id @default(cuid())
+  organizationId String
+  fullName       String
+  slug           String
+  email          String?
+  phone          String?
+  handicapIndex  Float?
+  photoUrl       String?
+  isActive       Boolean  @default(true)
+  joinedAt       DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  rounds       Round[]
+  achievements Achievement[]
+  rankings     SeasonRanking[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, isActive])
+  @@map("players")
+}
+
+// ─────────────────────────────────────────
+// SEASONS
+// ─────────────────────────────────────────
+
+model Season {
+  id                String   @id @default(cuid())
+  organizationId    String
+  name              String
+  startDate         DateTime
+  endDate           DateTime
+  isActive          Boolean  @default(false)
+  maxRoundsPerMonth Int      @default(2)
+  autoDiscards      Int      @default(1)
+  pointsConfig      Json     @default("{\"positions\":[100,90,85,80,76,72,68,64,60,56],\"participation\":40}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  rounds       Round[]
+  rankings     SeasonRanking[]
+
+  @@map("seasons")
+}
+
+// ─────────────────────────────────────────
+// ROUNDS
+// ─────────────────────────────────────────
+
+model Round {
+  id             String @id @default(cuid())
+  organizationId String
+  seasonId       String
+  playerId       String
+
+  playedAt     DateTime
+  clubName     String?
+  courseName   String?
+  grossScore   Int?
+  netScore     Float?
+  handicapUsed Float?
+  points       Int    @default(0)
+  birdies      Int    @default(0)
+  eagles       Int    @default(0)
+  pars         Int    @default(0)
+  witnessName  String?
+
+  status          String   @default("PENDING")
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?
+
+  scorecardUrl    String?
+  bestApproachUrl String?
+  longDriveUrl    String?
+
+  ocrData        Json?
+  ocrNeedsReview Boolean @default(false)
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  season       Season       @relation(fields: [seasonId], references: [id])
+  player       Player       @relation(fields: [playerId], references: [id])
+  approvedBy   User?        @relation("ApprovedBy", fields: [approvedById], references: [id])
+  scores       RoundScore[]
+  awards       RoundAward[]
+
+  @@index([organizationId, playedAt(sort: Desc)])
+  @@index([seasonId, playerId])
+  @@index([status])
+  @@map("rounds")
+}
+
+model RoundScore {
+  id         String @id @default(cuid())
+  roundId    String
+  holeNumber Int
+  par        Int?
+  score      Int?
+
+  round Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, holeNumber])
+  @@map("round_scores")
+}
+
+// ─────────────────────────────────────────
+// AWARDS (Long Drive / Best Approach)
+// ─────────────────────────────────────────
+
+model RoundAward {
+  id             String   @id @default(cuid())
+  organizationId String
+  roundId        String
+  awardType      String
+  valueText      String?
+  valueNum       Float?
+  unit           String   @default("yards")
+  isLeader       Boolean  @default(false)
+  playedAt       DateTime
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  round        Round        @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@map("round_awards")
+}
+
+// ─────────────────────────────────────────
+// SEASON RANKINGS (calculated)
+// ─────────────────────────────────────────
+
+model SeasonRanking {
+  id             String   @id @default(cuid())
+  organizationId String
+  seasonId       String
+  playerId       String
+  position       Int?
+  totalPoints    Int      @default(0)
+  monthsPlayed   Int      @default(0)
+  roundsPlayed   Int      @default(0)
+  bestGross      Int?
+  bestNet        Float?
+  totalBirdies   Int      @default(0)
+  totalEagles    Int      @default(0)
+  calculatedAt   DateTime @default(now())
+
+  season Season @relation(fields: [seasonId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([organizationId, seasonId, playerId])
+  @@map("season_rankings")
+}
+
+// ─────────────────────────────────────────
+// ACHIEVEMENTS
+// ─────────────────────────────────────────
+
+model Achievement {
+  id             String   @id @default(cuid())
+  organizationId String
+  playerId       String
+  type           String
+  title          String
+  description    String?
+  icon           String?
+  achievedAt     DateTime @default(now())
+  metadata       Json?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  player       Player       @relation(fields: [playerId], references: [id])
+
+  @@unique([organizationId, playerId, type])
+  @@map("achievements")
+}
+
+// ─────────────────────────────────────────
+// ACTIVITY FEED
+// ─────────────────────────────────────────
+
+model ActivityFeed {
+  id             String   @id @default(cuid())
+  organizationId String
+  playerId       String?
+  playerName     String?
+  type           String
+  message        String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("activity_feed")
+}
+
+// ─────────────────────────────────────────
+// AUDIT LOGS
+// ─────────────────────────────────────────
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String?
+  action         String
+  tableName      String?
+  recordId       String?
+  oldValues      Json?
+  newValues      Json?
+  createdAt      DateTime @default(now())
+
+  user         User?         @relation(fields: [userId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
