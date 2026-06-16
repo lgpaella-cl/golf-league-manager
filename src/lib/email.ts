@@ -1,4 +1,13 @@
 import 'server-only'
+import nodemailer from 'nodemailer'
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER!,
+    pass: process.env.GMAIL_APP_PASSWORD!,
+  },
+})
 
 export async function sendInvitationEmail(opts: {
   to: string
@@ -8,18 +17,11 @@ export async function sendInvitationEmail(opts: {
 }) {
   const { to, playerName, leagueName, inviteUrl } = opts
 
-  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'api-key': process.env.BREVO_API_KEY!,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      sender: { name: leagueName, email: 'guillermo.achondo@gmail.com' },
-      to: [{ email: to, name: playerName }],
-      subject: `Invitación a ${leagueName}`,
-      htmlContent: `
+  await transporter.sendMail({
+    from: `"${leagueName}" <${process.env.GMAIL_USER}>`,
+    to,
+    subject: `Invitación a ${leagueName}`,
+    html: `
 <!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -62,11 +64,5 @@ export async function sendInvitationEmail(opts: {
   </table>
 </body>
 </html>`.trim(),
-    }),
   })
-
-  if (!response.ok) {
-    const err = await response.text()
-    throw new Error(`Brevo error ${response.status}: ${err}`)
-  }
 }
