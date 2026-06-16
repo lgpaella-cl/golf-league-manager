@@ -1,7 +1,4 @@
 import 'server-only'
-import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function sendInvitationEmail(opts: {
   to: string
@@ -11,11 +8,18 @@ export async function sendInvitationEmail(opts: {
 }) {
   const { to, playerName, leagueName, inviteUrl } = opts
 
-  await resend.emails.send({
-    from: 'Golf League <onboarding@resend.dev>',
-    to,
-    subject: `Invitación a ${leagueName}`,
-    html: `
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': process.env.BREVO_API_KEY!,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: leagueName, email: 'guillermo.achondo@gmail.com' },
+      to: [{ email: to, name: playerName }],
+      subject: `Invitación a ${leagueName}`,
+      htmlContent: `
 <!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -57,7 +61,12 @@ export async function sendInvitationEmail(opts: {
     </td></tr>
   </table>
 </body>
-</html>
-    `.trim(),
+</html>`.trim(),
+    }),
   })
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error(`Brevo error ${response.status}: ${err}`)
+  }
 }
